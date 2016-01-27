@@ -7,8 +7,11 @@
 #define PIN2A 10
 #define PIN2B 9
 #define PIN2C 8
+#define ANIMSPEED 60
 
 CRGB   leds[NUM_SLOTS];
+
+static unsigned long lWaitMillis;
 
 void setup() {
   Serial.begin(9600);
@@ -19,6 +22,7 @@ void setup() {
   pinMode(PIN2B, OUTPUT);
   pinMode(PIN2C, OUTPUT);
   FastLED.addLeds<WS2812,DATA_PIN, GRB>(leds, NUM_SLOTS);
+  lWaitMillis = millis() + ANIMSPEED;
 }
 
 // Initial hal-referencevalues for Off state for each slot
@@ -51,6 +55,41 @@ int calibrate[NUM_SLOTS] = {
   1, 1, 1, 1, 1, 
   1, 1, 1, 1, 1, 
   1, 1, 1, 1, 1
+};
+
+int statusFlags[NUM_SLOTS] = {
+  0, 0, 0, 0, 0, 
+  0, 0, 0, 0, 0, 
+  0, 0, 0, 0, 0, 
+  0, 0, 0, 0, 0
+};
+
+int lastStatusFlags[NUM_SLOTS] = {
+  0, 0, 0, 0, 0, 
+  0, 0, 0, 0, 0, 
+  0, 0, 0, 0, 0, 
+  0, 0, 0, 0, 0
+};
+
+int blockLedWrite[NUM_SLOTS] = {
+  0, 0, 0, 0, 0, 
+  0, 0, 0, 0, 0, 
+  0, 0, 0, 0, 0, 
+  0, 0, 0, 0, 0
+};
+
+int rippleEffect[NUM_SLOTS] = {
+  20, 20, 20, 20, 20, 
+  20, 20, 20, 20, 20, 
+  20, 20, 20, 20, 20, 
+  20, 20, 20, 20, 20
+};
+
+int rippleEffectDirection[NUM_SLOTS] = {
+  20, 20, 20, 20, 20, 
+  20, 20, 20, 20, 20, 
+  20, 20, 20, 20, 20, 
+  20, 20, 20, 20, 20
 };
 
 // iteration Settings
@@ -98,15 +137,15 @@ void loop() {
 
       // If value is nearer on the reference value for On
       if (abs(offsetOn) < abs(offsetOff)) {
-        leds[slot] = 0x65FB06;
+        statusFlags[slot] = 1;
       // If value is nearer on the reference value for Off
       } else {
-        leds[slot] = 0x300000;
+        statusFlags[slot] = 0;
       }
 
       // if more calibration is needed
       if ((valueOff[slot] - valueOn[slot]) < onOffOffset) {
-      leds[slot] = 0x0000FF;
+      statusFlags[slot] = 2;
 
       // if calibration is complete
       } else {
@@ -116,9 +155,62 @@ void loop() {
       Serial.print('-');
     }
     Serial.println('E');
-    FastLED.show();  
     flatteningIteration = -1;
   }
+
+  for (int slot = 0; slot < NUM_SLOTS; slot++) {
+    if (lastStatusFlags[slot] != statusFlags[slot]) {
+      rippleEffect[slot] = 0;
+      if (statusFlags[slot] == 1) {
+        rippleEffectDirection[slot] = NUM_SLOTS;
+      } else {
+        rippleEffectDirection[slot] = 0;
+      }
+      lastStatusFlags[slot] = statusFlags[slot];
+    }
+
+    if (!blockLedWrite[slot]) {
+      if (statusFlags[slot] == 1) {
+        leds[slot] = 0x65FB06;
+      } else {
+        leds[slot] = 0x300000;
+      }
+      if (statusFlags[slot] == 1) {
+        leds[slot] = 0x0000FF;
+      }
+    }
+  }
+
+  if( (long)( millis() - lWaitMillis ) >= 0) {
+    for (int slot = 0; slot < NUM_SLOTS; slot++) {
+      blockLedWrite[slot] = 0;
+      if (rippleEffect[slot] < NUM_SLOTS) {
+        bool notDrawn = 1;
+        do {
+          int pos1 = slot + rippleEffectDirection[slot]-rippleEffect[slot];
+          int pos2 = slot - (rippleEffectDirection[slot]-rippleEffect[slot]);
+
+          if (pos1 < NUM_SLOTS) {
+            leds[slot] = 0xFFFFFF;
+            blockLedWrite[slot] = 1;
+            notDrawn = 0;
+          }
+          
+          if (pos2 >= 0) {
+            leds[slot] = 0xFFFFFF;
+            blockLedWrite[slot] = 1;
+            notDrawn = 0;
+          }
+
+          rippleEffect[slot]++;
+        } while (notDrawn);
+      }
+    }
+    lWaitMillis += ANIMSPEED;
+  }
+  
+  FastLED.show(); 
+  
   flatteningIteration++;
 }
 
