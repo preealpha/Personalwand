@@ -97,7 +97,7 @@ int flatteningIteration = 0;
 int flatteningIterations = 10;
 
 // calibration Settings
-int onOffOffset = 20;
+int onOffOffset = 30;
 
 void loop() {
   // If this is the first run, just read the hal-values
