@@ -33,6 +33,14 @@ int valueOff[NUM_SLOTS] = {
   0,0,0,0,0
 };
 
+// Initial holidy status from all elements
+int holiday[NUM_SLOTS] = {
+  0,0,0,0,0,
+  0,0,0,0,0,
+  0,0,0,0,0,
+  0,0,0,0,0
+};
+
 // Initial hal-referencevalues for On state for each slot
 int valueOn[NUM_SLOTS] = {
   1023,1023,1023,1023,1023,
@@ -51,44 +59,44 @@ long value[NUM_SLOTS] = {
 
 // Initial "needs to be calibrated"-flag for each slot
 int calibrate[NUM_SLOTS] = {
-  1, 1, 1, 1, 1, 
-  1, 1, 1, 1, 1, 
-  1, 1, 1, 1, 1, 
+  1, 1, 1, 1, 1,
+  1, 1, 1, 1, 1,
+  1, 1, 1, 1, 1,
   1, 1, 1, 1, 1
 };
 
 int statusFlags[NUM_SLOTS] = {
-  2, 2, 2, 2, 2, 
-  2, 2, 2, 2, 2, 
-  2, 2, 2, 2, 2, 
+  2, 2, 2, 2, 2,
+  2, 2, 2, 2, 2,
+  2, 2, 2, 2, 2,
   2, 2, 2, 2, 2
 };
 
 int lastStatusFlags[NUM_SLOTS] = {
-  2, 2, 2, 2, 2, 
-  2, 2, 2, 2, 2, 
-  2, 2, 2, 0, 2, 
+  2, 2, 2, 2, 2,
+  2, 2, 2, 2, 2,
+  2, 2, 2, 0, 2,
   2, 2, 2, 2, 2
 };
 
 int blockLedWrite[NUM_SLOTS] = {
-  0, 0, 0, 0, 0, 
-  0, 0, 0, 0, 0, 
-  0, 0, 0, 0, 0, 
+  0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0,
   0, 0, 0, 0, 0
 };
 
 int rippleEffect[NUM_SLOTS] = {
-  20, 20, 20, 20, 20, 
-  20, 20, 20, 20, 20, 
-  20, 20, 20, 20, 20, 
+  20, 20, 20, 20, 20,
+  20, 20, 20, 20, 20,
+  20, 20, 20, 20, 20,
   20, 20, 20, 20, 20
 };
 
 int rippleEffectDirection[NUM_SLOTS] = {
-  20, 20, 20, 20, 20, 
-  20, 20, 20, 20, 20, 
-  20, 20, 20, 20, 20, 
+  20, 20, 20, 20, 20,
+  20, 20, 20, 20, 20,
+  20, 20, 20, 20, 20,
   20, 20, 20, 20, 20
 };
 
@@ -99,7 +107,20 @@ int flatteningIterations = 10;
 // calibration Settings
 int onOffOffset = 30;
 
+String holidayStatus;
+
 void loop() {
+
+  if(Serial.available() > 0) {
+        holidayStatus = Serial.readStringUntil('\n');
+        
+        for (int i = 0; i < holidayStatus.length(); i++) {
+            if (i < NUM_SLOTS) {
+              holiday[i] = holidayStatus[i] - '0';
+            }
+        }
+    }
+
   // If this is the first run, just read the hal-values
   if (flatteningIteration == 0) {
     for (int slot = 0; slot < NUM_SLOTS; slot++) {
@@ -116,14 +137,10 @@ void loop() {
 
   // if it is the last run, do the magic
   if (flatteningIteration >= flatteningIterations) {
-    
+
     for (int slot = 0; slot < NUM_SLOTS; slot++) {
       // Calculate the average value of all iterations
       value[slot] = value[slot]/flatteningIterations;
-      //Serial.print(slot);
-      //Serial.print('-');
-      //Serial.print(value[slot]);
-      //Serial.print('-');
 
       // If calibration is needed
       if (calibrate[slot] == 1) {
@@ -143,6 +160,10 @@ void loop() {
         statusFlags[slot] = 0;
       }
 
+      if (holiday[slot] > 0) {
+        statusFlags[slot] = 3;
+      }
+
       // if more calibration is needed
       if ((valueOff[slot] - valueOn[slot]) < onOffOffset) {
         statusFlags[slot] = 2;
@@ -150,10 +171,10 @@ void loop() {
       } else {
         calibrate[slot] = 0;
       }
-      
-      //Serial.print(valueOff[slot]);
+
+      Serial.print(statusFlags[slot]);
     }
-    //Serial.println('E');
+    Serial.println('E');
     flatteningIteration = -1;
   }
 
@@ -174,61 +195,60 @@ void loop() {
       } else {
         leds[slot] = 0x300000;
       }
+      if (statusFlags[slot] == 3) {
+        leds[slot] = 0xFFAA00;
+      }
       if (statusFlags[slot] == 2) {
         leds[slot] = 0x0000FF;
       }
     }
-    Serial.print(statusFlags[slot]);
   }
-  Serial.println('E');
 
   if( (long)( millis() - lWaitMillis ) >= 0) {
-    
+
     for (int slot = 0; slot < NUM_SLOTS; slot++) {
-      
+
       blockLedWrite[slot] = 0;
-      
+
       if (rippleEffect[slot] < NUM_SLOTS) {
         int notDrawn = 1;
-        
+
         //do {
           int slotNr = slot;
           int pos1t = slotNr + rippleEffect[slot];
           int pos2t = slotNr - rippleEffect[slot];
-          
+
           if (pos1t < NUM_SLOTS && pos1t >= 0) {
             leds[pos1t] = 0xFFFFFF;
             blockLedWrite[pos1t] = 1;
             notDrawn = 0;
           }
-          
+
           if (pos2t >= 0 && pos2t < NUM_SLOTS) {
             leds[pos2t] = 0xFFFFFF;
             blockLedWrite[pos2t] = 1;
             notDrawn = 0;
           }
-          
-          Serial.println(slot);
           rippleEffect[slot]++;
         //} while (notDrawn==1);
-        
+
       }
-      
+
     }
     lWaitMillis += ANIMSPEED;
   }
-  FastLED.show(); 
-  
+  FastLED.show();
+
   flatteningIteration++;
 }
 
 int readSensor(int slot) {
 
    // select the bit
-  int value1A = bitRead(slot,0);    
+  int value1A = bitRead(slot,0);
   int value1B = bitRead(slot,1);
   int value1C = bitRead(slot,2);
-  int value2A = bitRead(slot,3);    
+  int value2A = bitRead(slot,3);
   int value2B = bitRead(slot,4);
   int value2C = bitRead(slot,5);
 
@@ -243,4 +263,3 @@ int readSensor(int slot) {
   // Read the hal-value
   return analogRead(A0);
 }
-
