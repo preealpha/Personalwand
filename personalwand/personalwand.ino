@@ -1,3 +1,4 @@
+#include <EEPROM.h>
 #include <FastLED.h>
 #define NUM_SLOTS 20
 #define DATA_PIN 12
@@ -13,6 +14,33 @@ CRGB   leds[NUM_SLOTS];
 
 static unsigned long lWaitMillis;
 
+// Initial hal-referencevalues for On state for each slot
+int valueOn[NUM_SLOTS] = {
+  1023,1023,1023,1023,1023,
+  1023,1023,1023,1023,1023,
+  1023,1023,1023,1023,1023,
+  1023,1023,1023,1023,1023
+};
+
+// Initial hal-referencevalues for Off state for each slot
+int valueOff[NUM_SLOTS] = {
+  0,0,0,0,0,
+  0,0,0,0,0,
+  0,0,0,0,0,
+  0,0,0,0,0
+};
+
+// Initial "needs to be calibrated"-flag for each slot
+int calibrate[NUM_SLOTS] = {
+  1, 1, 1, 1, 1,
+  1, 1, 1, 1, 1,
+  1, 1, 1, 1, 1,
+  1, 1, 1, 1, 1
+};
+
+int needCalibrate = 1;
+int forceCalibration = 1;
+
 void setup() {
   Serial.begin(9600);
   pinMode(PIN1A, OUTPUT);
@@ -23,31 +51,22 @@ void setup() {
   pinMode(PIN2C, OUTPUT);
   FastLED.addLeds<WS2812,DATA_PIN, GRB>(leds, NUM_SLOTS);
   lWaitMillis = millis() + ANIMSPEED;
+
+  if (forceCalibration == 0) {
+    if ( EEPROM.read ( 0 ) != 0xff ) {
+      for (int i = 0; i < NUM_SLOTS; ++i ) {
+        valueOn[i] = EEPROM.read(i);
+      }
+      for (int i = 0; i < NUM_SLOTS; ++i ) {
+        valueOff[i] = EEPROM.read(i+NUM_SLOTS);
+      } 
+      for (int i = 0; i < NUM_SLOTS; ++i ) {
+        calibrate[i] = 0;
+      }  
+      needCalibrate = 0;
+    }
+  }
 }
-
-// Initial hal-referencevalues for Off state for each slot
-int valueOff[NUM_SLOTS] = {
-  0,0,0,0,0,
-  0,0,0,0,0,
-  0,0,0,0,0,
-  0,0,0,0,0
-};
-
-// Initial holidy status from all elements
-int holiday[NUM_SLOTS] = {
-  0,0,0,0,0,
-  0,0,0,0,0,
-  0,0,0,0,0,
-  0,0,0,0,0
-};
-
-// Initial hal-referencevalues for On state for each slot
-int valueOn[NUM_SLOTS] = {
-  1023,1023,1023,1023,1023,
-  1023,1023,1023,1023,1023,
-  1023,1023,1023,1023,1023,
-  1023,1023,1023,1023,1023
-};
 
 // Initial hal-values for each slot
 long value[NUM_SLOTS] = {
@@ -57,13 +76,15 @@ long value[NUM_SLOTS] = {
   0,0,0,0,0
   };
 
-// Initial "needs to be calibrated"-flag for each slot
-int calibrate[NUM_SLOTS] = {
-  1, 1, 1, 1, 1,
-  1, 1, 1, 1, 1,
-  1, 1, 1, 1, 1,
-  1, 1, 1, 1, 1
+// Initial holidy status from all elements
+int holiday[NUM_SLOTS] = {
+  0,0,0,0,0,
+  0,0,0,0,0,
+  0,0,0,0,0,
+  0,0,0,0,0
 };
+
+
 
 int statusFlags[NUM_SLOTS] = {
   2, 2, 2, 2, 2,
@@ -110,6 +131,23 @@ int onOffOffset = 30;
 String holidayStatus;
 
 void loop() {
+
+  // Save Calibration to EPROM
+  if (needCalibrate == 1) {
+    int allCalibrated = 1;
+    for (int i = 0; i < NUM_SLOTS; ++i ) {
+      if (calibrate[i] == 1) allCalibrated = 0;
+    }
+    if (allCalibrated) {
+      needCalibrate = 0;
+      for (int i = 0; i < NUM_SLOTS; ++i ) {
+        EEPROM.write(i, valueOn[i]);
+      }
+      for (int i = 0; i < NUM_SLOTS; ++i ) {
+        EEPROM.write(i+NUM_SLOTS, valueOff[i]);
+      } 
+    }
+  }
 
   if(Serial.available() > 0) {
         holidayStatus = Serial.readStringUntil('\n');
