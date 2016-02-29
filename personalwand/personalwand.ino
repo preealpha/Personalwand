@@ -133,6 +133,7 @@ String holidayStatus;
 void loop() {
 
   // Save Calibration to EPROM
+  /*
   if (needCalibrate == 1) {
     int allCalibrated = 1;
     for (int i = 0; i < NUM_SLOTS; ++i ) {
@@ -148,7 +149,8 @@ void loop() {
       } 
     }
   }
-
+  */
+  
   if(Serial.available() > 0) {
         holidayStatus = Serial.readStringUntil('\n');
         
@@ -198,8 +200,12 @@ void loop() {
         statusFlags[slot] = 0;
       }
 
-      if (holiday[slot] > 0) {
+      if (holiday[slot] == 1) {
         statusFlags[slot] = 3;
+      }
+      
+      if (holiday[slot] == 2) {
+        statusFlags[slot] = 4;
       }
 
       // if more calibration is needed
@@ -234,7 +240,10 @@ void loop() {
         leds[slot] = 0x300000;
       }
       if (statusFlags[slot] == 3) {
-        leds[slot] = 0xFFAA00;
+        leds[slot] = 0x00FFCC;
+      }
+      if (statusFlags[slot] == 4) {
+        leds[slot] = 0xFFDD00;
       }
       if (statusFlags[slot] == 2) {
         leds[slot] = 0x0000FF;
